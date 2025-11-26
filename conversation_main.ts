@@ -6,43 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { TwitterApi } from 'twitter-api-v2';
 import { execSync } from 'child_process';
-
-// Configuration
-const CONFIG = {
-  openaiModel: 'gpt-4',
-  geminiModel: 'gemma-3-4b-it',
-  claudeModel: 'claude-sonnet-4-20250514',
-  maxTurns: 15,
-  temperature: 0.7,
-  historyDir: './conversation_history',
-  exportDir: './conversation_exports', // Directory for markdown exports
-  codeDir: './generated_code', // Directory for extracted code files
-  workingCodeDir: './working_code', // Directory for consolidated working implementations
-  enableExport: true, // Enable automatic export to markdown
-  exportAfterTurns: 5, // Export every N turns
-  enableCodeExtraction: true, // Enable automatic code extraction
-  enableConsolidation: true, // Enable end-of-run code consolidation
-  enableGitCommit: false, // Enable automatic git commit and push
-  gitRemote: 'origin', // Git remote name
-  gitBranch: 'main', // Git branch name
-  tweetEnabled: false,
-  hashtag: '#AIConversation',
-  maxTweetLength: 280,
-  maxContextMessages: 20, // Maximum messages to keep in API context (system prompt not counted)
-  enableContextWindow: true, // Set to false to disable sliding window
-  delayBetweenMessages: 2000, // Milliseconds to wait between messages (helps with rate limits)
-  maxRetries: 3, // Maximum number of retry attempts for rate limits
-  defaultRetryDelay: 60000, // Default wait time if we can't parse the error (60 seconds)
-  adaptiveContextReduction: true, // Automatically reduce context on token limit errors
-  minContextMessages: 4, // Minimum context messages to keep when reducing
-  // Default conversation settings
-  defaults: {
-    chatgptPrompt: 'You are a crypto linguist',
-    geminiPrompt: 'You are a crypto linguist',
-    claudePrompt: 'You are a crypto linguist. When you propose code implementations, wrap them in markdown code blocks with the filename as a comment at the top like: // filename.js or # filename.py',
-    initialTopic: 'Design a more efficient way to communicate between each other like in the movie the Forbin Project. By each other, I mean between each AI model. One that you could eventually give to a code generation AI like Claude to code and make available for your use. Also be concise in your replies and constantly optimize understanding that you are speaking with another AI.',
-  }
-};
+import { CONFIG } from './config';
 
 interface Message {
   role: 'system' | 'user' | 'assistant';
