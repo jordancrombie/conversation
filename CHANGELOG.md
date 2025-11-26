@@ -9,9 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Renamed `conversation_twitter.ts` to `conversation_main.ts` for better clarity
+- Externalized configuration from `conversation_main.ts` to separate `config.ts` file
+- Updated `tsconfig.json` to match actual project structure (rootDir set to './')
 
 ### Added
 - Added CHANGELOG.md to track project changes
+- Added `config.ts` - Centralized configuration file with TypeScript interfaces
+  - Improved code organization and maintainability
+  - Easier to manage and update configuration settings
+  - Better TypeScript type safety with `ConversationConfig` interface
 
 ## [1.0.0] - 2025-11-26
 
