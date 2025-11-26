@@ -57,7 +57,7 @@ export const CONFIG: ConversationConfig = {
   openaiModel: 'gpt-4',
   geminiModel: 'gemma-3-4b-it',
   claudeModel: 'claude-sonnet-4-20250514',
-  grokModel: 'grok-beta',
+  grokModel: 'grok-3',
   temperature: 0.7,
 
   // Conversation Settings
