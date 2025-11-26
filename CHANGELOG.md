@@ -7,12 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Grok (xAI) Integration** - Added support for Grok as a fourth AI participant
+  - New `GrokAgent` class with OpenAI-compatible API integration
+  - Grok configuration in `config.ts` (model: 'grok-beta')
+  - Grok system prompt in default conversation settings
+  - API key input via environment variable `XAI_API_KEY` or prompt
+  - Full conversation state persistence for Grok
+  - Conversation now rotates through all four AI models: ChatGPT, Gemini, Claude, and Grok
+
 ### Changed
 - Renamed `conversation_twitter.ts` to `conversation_main.ts` for better clarity
 - Externalized configuration from `conversation_main.ts` to separate `config.ts` file
 - Updated `tsconfig.json` to match actual project structure (rootDir set to './')
+- Updated main conversation loop to include Grok as fourth participant
+- Updated conversation header to reflect four-way conversation
+- Updated agent initialization and state loading to include Grok
 
-### Added
+### Added (Previous)
 - Added CHANGELOG.md to track project changes
 - Added `config.ts` - Centralized configuration file with TypeScript interfaces
   - Improved code organization and maintainability

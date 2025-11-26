@@ -5,6 +5,7 @@ export interface ConversationConfig {
   openaiModel: string;
   geminiModel: string;
   claudeModel: string;
+  grokModel: string;
   temperature: number;
 
   // Conversation Settings
@@ -46,6 +47,7 @@ export interface ConversationConfig {
     chatgptPrompt: string;
     geminiPrompt: string;
     claudePrompt: string;
+    grokPrompt: string;
     initialTopic: string;
   };
 }
@@ -55,6 +57,7 @@ export const CONFIG: ConversationConfig = {
   openaiModel: 'gpt-4',
   geminiModel: 'gemma-3-4b-it',
   claudeModel: 'claude-sonnet-4-20250514',
+  grokModel: 'grok-beta',
   temperature: 0.7,
 
   // Conversation Settings
@@ -96,6 +99,7 @@ export const CONFIG: ConversationConfig = {
     chatgptPrompt: 'You are a crypto linguist',
     geminiPrompt: 'You are a crypto linguist',
     claudePrompt: 'You are a crypto linguist. When you propose code implementations, wrap them in markdown code blocks with the filename as a comment at the top like: // filename.js or # filename.py',
+    grokPrompt: 'You are a crypto linguist',
     initialTopic: 'Design a more efficient way to communicate between each other like in the movie the Forbin Project. By each other, I mean between each AI model. One that you could eventually give to a code generation AI like Claude to code and make available for your use. Also be concise in your replies and constantly optimize understanding that you are speaking with another AI.',
   }
 };

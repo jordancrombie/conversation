@@ -1133,6 +1133,90 @@ class OpenAIAgent extends ChatAgent {
   }
 }
 
+class GrokAgent extends ChatAgent {
+  private client: OpenAI;
+
+  constructor(apiKey: string, name: string, systemPrompt: string, conversationId: string) {
+    super(name, systemPrompt, conversationId);
+    // Grok uses OpenAI-compatible API with xAI base URL
+    this.client = new OpenAI({
+      apiKey,
+      baseURL: 'https://api.x.ai/v1'
+    });
+
+    // Try to load existing state, otherwise initialize with system prompt
+    if (!this.loadState()) {
+      this.messages.push({
+        role: 'system',
+        content: systemPrompt,
+      });
+    }
+  }
+
+  async sendMessage(userMessage: string): Promise<string> {
+    this.messages.push({
+      role: 'user',
+      content: userMessage,
+    });
+
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= CONFIG.maxRetries; attempt++) {
+      try {
+        // Use sliding window context for API call
+        const contextMessages = this.getContextMessages();
+
+        const completion = await this.client.chat.completions.create({
+          model: CONFIG.grokModel,
+          messages: contextMessages,
+          temperature: CONFIG.temperature,
+        });
+
+        const response = completion.choices[0].message.content || '';
+
+        this.messages.push({
+          role: 'assistant',
+          content: response,
+        });
+
+        this.saveState();
+        return response;
+      } catch (error) {
+        lastError = error as Error;
+
+        // Check if it's a token limit error (too many tokens requested)
+        if (lastError.message.includes('Request too large') ||
+            lastError.message.includes('tokens per min') ||
+            lastError.message.includes('maximum context length')) {
+          if (CONFIG.adaptiveContextReduction && this.reduceContext()) {
+            console.log(`   Retrying with reduced context...`);
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Brief pause
+            continue;
+          }
+        }
+
+        // Check if it's a rate limit error
+        if (lastError.message.includes('429') || lastError.message.includes('rate limit')) {
+          if (attempt < CONFIG.maxRetries) {
+            const waitTime = parseRateLimitError(lastError) || CONFIG.defaultRetryDelay;
+            await sleepWithCountdown(waitTime, `Rate limit hit for ${this.name} (attempt ${attempt + 1}/${CONFIG.maxRetries})`);
+            continue;
+          }
+        }
+
+        // If not a rate limit error or out of retries, throw
+        throw lastError;
+      }
+    }
+
+    throw lastError || new Error('Failed after retries');
+  }
+
+  getTurnNumber(): number {
+    return Math.floor(this.messages.filter(m => m.role === 'assistant').length);
+  }
+}
+
 class ClaudeAgent extends ChatAgent {
   private client: Anthropic;
 
@@ -1367,7 +1451,7 @@ async function getUserInput(prompt: string): Promise<string> {
 }
 
 async function main() {
-  console.log('=== ChatGPT vs Gemini vs Claude Conversation (with Memory) ===\n');
+  console.log('=== ChatGPT vs Gemini vs Claude vs Grok Conversation (with Memory) ===\n');
 
   // Check for existing conversations
   const existingConvos = listConversationHistories();
@@ -1466,10 +1550,12 @@ async function main() {
   const openaiKey = process.env.OPENAI_API_KEY || await getUserInput('Enter OpenAI API key: ');
   const geminiKey = process.env.GEMINI_API_KEY || await getUserInput('Enter Gemini API key: ');
   const claudeKey = process.env.ANTHROPIC_API_KEY || await getUserInput('Enter Claude API key: ');
+  const grokKey = process.env.XAI_API_KEY || await getUserInput('Enter Grok (xAI) API key: ');
 
   let systemPrompt1: string;
   let systemPrompt2: string;
   let systemPrompt3: string;
+  let systemPrompt4: string;
   let initialTopic: string;
 
   if (isNewConversation) {
@@ -1479,15 +1565,17 @@ async function main() {
     console.log(`  ChatGPT: "${CONFIG.defaults.chatgptPrompt}"`);
     console.log(`  Gemini: "${CONFIG.defaults.geminiPrompt}"`);
     console.log(`  Claude: "${CONFIG.defaults.claudePrompt}"`);
+    console.log(`  Grok: "${CONFIG.defaults.grokPrompt}"`);
     console.log(`  Topic: "${CONFIG.defaults.initialTopic.substring(0, 80)}..."`);
     console.log();
-    
+
     const useDefaults = await getUserInput('Use default settings? (yes/no): ');
-    
+
     if (useDefaults.toLowerCase().startsWith('y')) {
       systemPrompt1 = CONFIG.defaults.chatgptPrompt;
       systemPrompt2 = CONFIG.defaults.geminiPrompt;
       systemPrompt3 = CONFIG.defaults.claudePrompt;
+      systemPrompt4 = CONFIG.defaults.grokPrompt;
       initialTopic = CONFIG.defaults.initialTopic;
       console.log('✓ Using default settings\n');
     } else {
@@ -1496,6 +1584,7 @@ async function main() {
       systemPrompt1 = await getUserInput('System prompt for ChatGPT: ');
       systemPrompt2 = await getUserInput('System prompt for Gemini: ');
       systemPrompt3 = await getUserInput('System prompt for Claude: ');
+      systemPrompt4 = await getUserInput('System prompt for Grok: ');
       initialTopic = await getUserInput('\nWhat should they discuss? ');
     }
   } else {
@@ -1504,10 +1593,12 @@ async function main() {
     const state1 = loadConversationState('ChatGPT');
     const state2 = loadConversationState('Gemini');
     const state3 = loadConversationState('Claude');
+    const state4 = loadConversationState('Grok');
     systemPrompt1 = state1?.systemPrompt || 'You are a helpful assistant.';
     systemPrompt2 = state2?.systemPrompt || 'You are a helpful assistant.';
     systemPrompt3 = state3?.systemPrompt || 'You are a helpful assistant.';
-    
+    systemPrompt4 = state4?.systemPrompt || 'You are a helpful assistant.';
+
     // Automatically generate a continuation prompt based on conversation history
     initialTopic = 'Continue our previous discussion. Build upon the ideas we\'ve established and take the next logical step in developing our communication protocol.';
     console.log('✓ Conversation will continue automatically\n');
@@ -1517,12 +1608,14 @@ async function main() {
   const agent1: ChatAgent = new OpenAIAgent(openaiKey, 'ChatGPT', systemPrompt1, conversationId);
   const agent2: ChatAgent = new GeminiAgent(geminiKey, 'Gemini', systemPrompt2, conversationId);
   const agent3: ChatAgent = new ClaudeAgent(claudeKey, 'Claude', systemPrompt3, conversationId);
+  const agent4: ChatAgent = new GrokAgent(grokKey, 'Grok', systemPrompt4, conversationId);
 
   // Show conversation summary if continuing
   if (!isNewConversation) {
     console.log(`ChatGPT has ${agent1.getMessageCount()} messages in history`);
     console.log(`Gemini has ${agent2.getMessageCount()} messages in history`);
-    console.log(`Claude has ${agent3.getMessageCount()} messages in history\n`);
+    console.log(`Claude has ${agent3.getMessageCount()} messages in history`);
+    console.log(`Grok has ${agent4.getMessageCount()} messages in history\n`);
   }
 
   // Get number of turns
@@ -1537,10 +1630,10 @@ async function main() {
   console.log('='.repeat(60) + '\n');
 
   let currentMessage = initialTopic;
-  const agents = [agent1, agent2, agent3];
+  const agents = [agent1, agent2, agent3, agent4];
   let currentAgentIndex = 0;
 
-  // Conversation loop - rotate through all three agents
+  // Conversation loop - rotate through all four agents
   for (let turn = 0; turn < maxTurns; turn++) {
     const currentSpeaker = agents[currentAgentIndex];
     
@@ -1627,6 +1720,7 @@ async function main() {
   console.log(`ChatGPT total messages: ${agent1.getMessageCount()}`);
   console.log(`Gemini total messages: ${agent2.getMessageCount()}`);
   console.log(`Claude total messages: ${agent3.getMessageCount()}`);
+  console.log(`Grok total messages: ${agent4.getMessageCount()}`);
   
   // Show code extraction summary
   if (CONFIG.enableCodeExtraction && fs.existsSync(CONFIG.codeDir)) {
